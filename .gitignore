@@ -4,3 +4,4 @@ Content/obj/
 Content/bin/
 *.user
 *.suo
+.DS_Store
