@@ -5,6 +5,13 @@ using System.Collections.Generic;
 
 namespace monogamekit;
 
+public enum MazeSize
+{
+    Small = 8,
+    Medium = 16,
+    Large = 24
+}
+
 public class Game1 : Game
 {
     private readonly GraphicsDeviceManager _graphics;
@@ -12,27 +19,14 @@ public class Game1 : Game
     private Texture2D _pixelTexture;
     
     // Maze: 0 = path, 1 = wall, 2 = end
-    private readonly int[,] _maze = new int[,]
-    {
-        {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-        {1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1},
-        {1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1},
-        {1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1},
-        {1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1},
-        {1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1},
-        {1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1},
-        {1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1},
-        {1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1},
-        {1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-        {1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1},
-        {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-        {1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 2, 1},
-        {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}
-    };
+    private int[,] _maze;
     
+    private MazeSize _currentMazeSize = MazeSize.Medium; // Default to Medium
+    private int _mazeWidth;
+    private int _mazeHeight;
     private const int TileSize = 40;
-    private const int MaxSteps = 20;
-    private readonly Vector2 _goalPosition = new(12, 12);
+    private int _maxSteps;
+    private Vector2 _goalPosition;
     private readonly System.Random _random = new();
     private Vector2 _playerPosition; // Start position (set randomly)
     private KeyboardState _previousKeyboardState;
@@ -48,13 +42,13 @@ public class Game1 : Game
         Content.RootDirectory = "Content";
         IsMouseVisible = true;
         
-        // Set window size to fit the maze
-        _graphics.PreferredBackBufferWidth = _maze.GetLength(1) * TileSize;
-        _graphics.PreferredBackBufferHeight = _maze.GetLength(0) * TileSize;
+        // Initialize maze dimensions based on default size
+        UpdateMazeSize();
     }
 
     protected override void Initialize()
     {
+        GenerateMaze();
         _playerPosition = GetRandomStartPosition();
         base.Initialize();
     }
@@ -82,6 +76,58 @@ public class Game1 : Game
         if (keyboardState.IsKeyDown(Keys.T) && !_previousKeyboardState.IsKeyDown(Keys.T))
         {
             _trailModeEnabled = !_trailModeEnabled;
+        }
+        
+        // Change maze size with S, M, L keys
+        if (keyboardState.IsKeyDown(Keys.S) && !_previousKeyboardState.IsKeyDown(Keys.S))
+        {
+            _currentMazeSize = MazeSize.Small;
+            UpdateMazeSize();
+            GenerateMaze();
+            _playerPosition = GetRandomStartPosition();
+            _gameWon = false;
+            _gameFailed = false;
+            _stepCount = 0;
+            _visitedTiles.Clear();
+            _visitedTiles.Add(((int)_playerPosition.X, (int)_playerPosition.Y));
+        }
+        
+        if (keyboardState.IsKeyDown(Keys.M) && !_previousKeyboardState.IsKeyDown(Keys.M))
+        {
+            _currentMazeSize = MazeSize.Medium;
+            UpdateMazeSize();
+            GenerateMaze();
+            _playerPosition = GetRandomStartPosition();
+            _gameWon = false;
+            _gameFailed = false;
+            _stepCount = 0;
+            _visitedTiles.Clear();
+            _visitedTiles.Add(((int)_playerPosition.X, (int)_playerPosition.Y));
+        }
+        
+        if (keyboardState.IsKeyDown(Keys.L) && !_previousKeyboardState.IsKeyDown(Keys.L))
+        {
+            _currentMazeSize = MazeSize.Large;
+            UpdateMazeSize();
+            GenerateMaze();
+            _playerPosition = GetRandomStartPosition();
+            _gameWon = false;
+            _gameFailed = false;
+            _stepCount = 0;
+            _visitedTiles.Clear();
+            _visitedTiles.Add(((int)_playerPosition.X, (int)_playerPosition.Y));
+        }
+        
+        // Press R to restart at any time (preserves current size)
+        if (keyboardState.IsKeyDown(Keys.R) && !_previousKeyboardState.IsKeyDown(Keys.R))
+        {
+            GenerateMaze();
+            _playerPosition = GetRandomStartPosition();
+            _gameWon = false;
+            _gameFailed = false;
+            _stepCount = 0;
+            _visitedTiles.Clear();
+            _visitedTiles.Add(((int)_playerPosition.X, (int)_playerPosition.Y));
         }
 
         if (!_gameWon && !_gameFailed)
@@ -129,7 +175,7 @@ public class Game1 : Game
                         _stepCount++;
                         
                         // Check if exceeded max steps
-                        if (_stepCount > MaxSteps)
+                        if (_stepCount > _maxSteps)
                         {
                             _gameFailed = true;
                         }
@@ -144,19 +190,6 @@ public class Game1 : Game
             }
             
             _previousKeyboardState = keyboardState;
-        }
-        else
-        {
-            // Press R to restart
-            if (keyboardState.IsKeyDown(Keys.R))
-            {
-                _playerPosition = GetRandomStartPosition();
-                _gameWon = false;
-                _gameFailed = false;
-                _stepCount = 0;
-                _visitedTiles.Clear();
-                _visitedTiles.Add(((int)_playerPosition.X, (int)_playerPosition.Y));
-            }
         }
 
         base.Update(gameTime);
@@ -173,7 +206,7 @@ public class Game1 : Game
         {
             for (int x = 0; x < _maze.GetLength(1); x++)
             {
-                Rectangle rect = new Rectangle(x * TileSize, y * TileSize, TileSize, TileSize);
+                Rectangle rect = new(x * TileSize, y * TileSize, TileSize, TileSize);
                 
                 if (_maze[y, x] == 1) // Wall
                 {
@@ -222,12 +255,12 @@ public class Game1 : Game
         }
         
         // Step counter - visual dots in top-right
-        int dotsToShow = System.Math.Min(_stepCount, MaxSteps); // Cap at MaxSteps for display
+        int dotsToShow = System.Math.Min(_stepCount, _maxSteps); // Cap at _maxSteps for display
         for (int i = 0; i < dotsToShow; i++)
         {
             int dotX = _graphics.PreferredBackBufferWidth - 25 - (i % 10) * 6;
             int dotY = 15 + (i / 10) * 12;
-            Color dotColor = _stepCount > MaxSteps ? Color.Red : Color.White;
+            Color dotColor = _stepCount > _maxSteps ? Color.Red : Color.White;
             DrawCircle(dotX, dotY, 2, dotColor);
         }
         
@@ -337,5 +370,129 @@ public class Game1 : Game
         
         // Fallback to (1, 1) if no valid positions found
         return new Vector2(1, 1);
+    }
+    
+    private void GenerateMaze()
+    {
+        // Initialize maze with all walls
+        _maze = new int[_mazeHeight, _mazeWidth];
+        for (int y = 0; y < _mazeHeight; y++)
+        {
+            for (int x = 0; x < _mazeWidth; x++)
+            {
+                _maze[y, x] = 1; // All walls
+            }
+        }
+        
+        // Use recursive backtracking to carve paths
+        // Start from position (1, 1)
+        CarvePath(1, 1);
+        
+        // Find a valid path tile in the bottom-right area for the goal
+        _goalPosition = FindGoalPosition();
+        _maze[(int)_goalPosition.Y, (int)_goalPosition.X] = 2;
+    }
+    
+    private Vector2 FindGoalPosition()
+    {
+        // Search for path tiles in bottom-right quadrant, starting from corner
+        List<Vector2> validGoalPositions = new List<Vector2>();
+        
+        // Start from the bottom-right and work inward
+        for (int y = _mazeHeight - 2; y >= _mazeHeight / 2; y--)
+        {
+            for (int x = _mazeWidth - 2; x >= _mazeWidth / 2; x--)
+            {
+                if (_maze[y, x] == 0) // Found a path tile
+                {
+                    validGoalPositions.Add(new Vector2(x, y));
+                }
+            }
+        }
+        
+        // Return the closest to bottom-right corner, or random if multiple options
+        if (validGoalPositions.Count > 0)
+        {
+            // Prefer positions closer to bottom-right by sorting
+            validGoalPositions.Sort((a, b) =>
+            {
+                int distA = (_mazeWidth - 1 - (int)a.X) + (_mazeHeight - 1 - (int)a.Y);
+                int distB = (_mazeWidth - 1 - (int)b.X) + (_mazeHeight - 1 - (int)b.Y);
+                return distA.CompareTo(distB);
+            });
+            
+            // Return the closest one (first in sorted list)
+            return validGoalPositions[0];
+        }
+        
+        // Fallback: find any path tile
+        for (int y = 1; y < _mazeHeight - 1; y++)
+        {
+            for (int x = 1; x < _mazeWidth - 1; x++)
+            {
+                if (_maze[y, x] == 0)
+                {
+                    return new Vector2(x, y);
+                }
+            }
+        }
+        
+        // Last resort fallback
+        return new Vector2(_mazeWidth - 2, _mazeHeight - 2);
+    }
+    
+    private void CarvePath(int x, int y)
+    {
+        // Mark current cell as path
+        _maze[y, x] = 0;
+        
+        // Create array of directions (right, down, left, up)
+        var directions = new[] { (2, 0), (0, 2), (-2, 0), (0, -2) };
+        
+        // Shuffle directions for randomness
+        for (int i = directions.Length - 1; i > 0; i--)
+        {
+            int j = _random.Next(i + 1);
+            (directions[i], directions[j]) = (directions[j], directions[i]);
+        }
+        
+        // Try each direction
+        foreach (var (dx, dy) in directions)
+        {
+            int newX = x + dx;
+            int newY = y + dy;
+            
+            // Check if the new position is valid and unvisited
+            if (newX > 0 && newX < _mazeWidth - 1 && 
+                newY > 0 && newY < _mazeHeight - 1 && 
+                _maze[newY, newX] == 1)
+            {
+                // Carve path between current and new cell
+                _maze[y + dy / 2, x + dx / 2] = 0;
+                
+                // Recursively carve from new cell
+                CarvePath(newX, newY);
+            }
+        }
+    }
+    
+    private void UpdateMazeSize()
+    {
+        _mazeWidth = (int)_currentMazeSize;
+        _mazeHeight = (int)_currentMazeSize;
+        
+        // Set max steps based on maze size
+        _maxSteps = _currentMazeSize switch
+        {
+            MazeSize.Small => 12,
+            MazeSize.Medium => 24,
+            MazeSize.Large => 48,
+            _ => 24
+        };
+        
+        // Update window size to fit the maze
+        _graphics.PreferredBackBufferWidth = _mazeWidth * TileSize;
+        _graphics.PreferredBackBufferHeight = _mazeHeight * TileSize;
+        _graphics.ApplyChanges();
     }
 }
