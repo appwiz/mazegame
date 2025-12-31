@@ -7,7 +7,7 @@ namespace monogamekit;
 
 public class Game1 : Game
 {
-    private GraphicsDeviceManager _graphics;
+    private readonly GraphicsDeviceManager _graphics;
     private SpriteBatch _spriteBatch;
     private Texture2D _pixelTexture;
     
@@ -33,14 +33,14 @@ public class Game1 : Game
     private const int TileSize = 40;
     private const int MaxSteps = 20;
     private readonly Vector2 _goalPosition = new(12, 12);
-    private readonly System.Random _random = new System.Random();
+    private readonly System.Random _random = new();
     private Vector2 _playerPosition; // Start position (set randomly)
     private KeyboardState _previousKeyboardState;
     private bool _gameWon = false;
     private bool _gameFailed = false;
     private int _stepCount = 0;
     private bool _trailModeEnabled = false;
-    private readonly HashSet<(int, int)> _visitedTiles = new HashSet<(int, int)>();
+    private readonly HashSet<(int, int)> _visitedTiles = new();
 
     public Game1()
     {
