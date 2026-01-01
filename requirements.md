@@ -126,7 +126,7 @@ Navigate from the starting position to the gold end tile within the step limit:
 | M | Switch to Medium maze (16x16) |
 | L | Switch to Large maze (24x24) |
 | R | Restart game (preserves current size) |
-| Escape | Exit game |
+| Q / Escape | Exit game |
 
 ## Features
 

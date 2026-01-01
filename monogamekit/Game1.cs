@@ -68,8 +68,8 @@ public class Game1 : Game
     protected override void Update(GameTime gameTime)
     {
         KeyboardState keyboardState = Keyboard.GetState();
-        
-        if (keyboardState.IsKeyDown(Keys.Escape))
+
+        if (keyboardState.IsKeyDown(Keys.Escape) || keyboardState.IsKeyDown(Keys.Q))
             Exit();
         
         // Toggle trail mode with T key
